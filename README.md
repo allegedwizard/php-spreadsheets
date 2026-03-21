@@ -12,7 +12,7 @@ Created by [Alleged Wizard](https://allegedwizard.com).
 ## Installation
 
 ```bash
-composer require allegedwizard/php-spreadsheets
+composer require allegedwizard/php-spreadsheets:^1.0
 ```
 
 ## Reading
@@ -138,6 +138,13 @@ Convert an associative array to a CSV string:
 
 ```php
 $csv = Spreadsheets::arrayToCsv($records);
+```
+
+## Testing
+
+```bash
+composer install
+composer test
 ```
 
 ## License
