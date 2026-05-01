@@ -466,7 +466,11 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
             if ('' !== $alt) {
                 $args .= ',' . $this->escapeFormulaArg($alt);
             }
-            $formula = '=IMAGE(' . $args . ')';
+            // Post-2007 functions must be stored with the _xlfn. prefix in
+            // the XML, otherwise Excel injects the implicit-intersection `@`
+            // operator before the call and the formula won't render. The
+            // prefix is stripped on display.
+            $formula = '=_xlfn.IMAGE(' . $args . ')';
             return new FormulaCell($formula, $linkStyle, '' !== $alt ? $alt : null);
         }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.5
+
+- Fix `image` type so Excel renders the image instead of showing `@IMAGE(...)`. Post-2007 Excel functions must be stored with the `_xlfn.` prefix in the XLSX XML; without it Excel injects the implicit-intersection `@` operator and the formula doesn't evaluate. Emit `=_xlfn.IMAGE(...)` -- Excel strips the prefix for display.
+
 ## v1.0.4
 
 - Add `image` model type. Accepts a URL string or `['url' => ..., 'alt' => ...]`. XLSX/XLS emit `=IMAGE("url"[,"alt"])` via FormulaCell (Excel 365+ only); CSV/ODS fall back to the URL (or `alt (url)` if both differ).

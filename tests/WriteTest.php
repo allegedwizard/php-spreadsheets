@@ -380,8 +380,10 @@ class WriteTest extends TestCase
         $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
         $zip->close();
 
-        $this->assertStringContainsString('IMAGE(&quot;https://example.com/cat.jpg&quot;)', $sheetXml);
-        $this->assertStringContainsString('IMAGE(&quot;https://example.com/dog.png&quot;,&quot;A good dog&quot;)', $sheetXml);
+        // Post-2007 functions need the _xlfn. prefix in the stored XML;
+        // Excel strips it for display and skips the implicit-intersection @.
+        $this->assertStringContainsString('_xlfn.IMAGE(&quot;https://example.com/cat.jpg&quot;)', $sheetXml);
+        $this->assertStringContainsString('_xlfn.IMAGE(&quot;https://example.com/dog.png&quot;,&quot;A good dog&quot;)', $sheetXml);
     }
 
     public function testWriteCsvImageTypeFallsBackToUrl(): void
