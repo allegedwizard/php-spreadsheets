@@ -99,7 +99,7 @@ $model = [
 $spreadsheet->write($records, $model);
 ```
 
-Supported types: `string`, `number`, `currency`, `date`, `boolean`, `link`.
+Supported types: `string`, `number`, `currency`, `date`, `boolean`, `link`, `image`, `formula`.
 
 #### Link Type
 
@@ -116,6 +116,38 @@ $model = [
 ];
 
 $spreadsheet->write($records, $model);
+```
+
+#### Image Type
+
+The `image` type produces an `=IMAGE("url")` formula in XLSX/XLS. CSV/ODS fall back to the URL as plain text. Values may be a plain URL string or an array with `url` and optional `alt`:
+
+```php
+$records = [
+    ['Name' => 'Cat', 'Pic' => 'https://example.com/cat.jpg'],
+    ['Name' => 'Dog', 'Pic' => ['url' => 'https://example.com/dog.png', 'alt' => 'A good dog']],
+];
+$model = [
+    'Name' => ['type' => 'string'],
+    'Pic'  => ['type' => 'image'],
+];
+```
+
+Note: `=IMAGE()` is **Excel 365 (2023+) only**. Older Excel desktop, LibreOffice, and Google Sheets will not render the image.
+
+#### Formula Type
+
+The `formula` type writes an arbitrary formula. The leading `=` is optional; the writer adds it if missing. CSV/ODS write the `computed` value if provided, otherwise the literal formula text:
+
+```php
+$records = [
+    ['Label' => 'Sum',    'Value' => '=SUM(1,2,3)'],
+    ['Label' => 'Concat', 'Value' => ['formula' => '=CONCAT("a","b")', 'computed' => 'ab']],
+];
+$model = [
+    'Label' => ['type' => 'string'],
+    'Value' => ['type' => 'formula'],
+];
 ```
 
 ### Multiple Sheets

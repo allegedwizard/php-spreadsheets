@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.4
+
+- Add `image` model type. Accepts a URL string or `['url' => ..., 'alt' => ...]`. XLSX/XLS emit `=IMAGE("url"[,"alt"])` via FormulaCell (Excel 365+ only); CSV/ODS fall back to the URL (or `alt (url)` if both differ).
+- Add `formula` model type for arbitrary user-supplied formulas. Accepts a formula string (with or without leading `=`) or `['formula' => ..., 'computed' => ...]`. XLSX/XLS emit a FormulaCell with the optional computed value; CSV/ODS write the computed value if given, otherwise the literal formula text.
+- Refactor `getRow` to switch on type for all array-shaped values (link/image/formula) before the scalar trim.
+- Generalize the normal-CSV array flattener (`flattenArrayForCsv`) to dispatch on shape.
+
 ## v1.0.3
 
 - Add `link` model type. Values can be a URL string or `['url' => ..., 'label' => ...]`. XLSX/XLS emit a clickable `=HYPERLINK(...)` formula; CSV/ODS fall back to a plain `label (url)` string. Embedded quotes are escaped per Excel formula rules.

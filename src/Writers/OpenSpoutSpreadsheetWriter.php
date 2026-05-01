@@ -125,11 +125,11 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
         $writer->addRow(Row::fromValues($headerColumns));
 
         foreach ($records as $row) {
-            // Normal CSV mode bypasses the model, but link values may still
-            // arrive as arrays -- flatten those to a string before writing.
+            // Normal CSV mode bypasses the model, but link/image/formula
+            // values may still arrive as arrays -- flatten before writing.
             foreach ($row as $key => $value) {
                 if (is_array($value)) {
-                    $row[$key] = $this->flattenLinkForCsv($value);
+                    $row[$key] = $this->flattenArrayForCsv($value);
                 }
             }
             $writer->addRow(Row::fromValues(array_values($row)));
@@ -318,10 +318,18 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
             $modelColumn = strtolower(trim($column));
             $dataType = $this->model[$modelColumn]['type'] ?? 'string';
 
-            // Handle link before the trim, because link values may be arrays.
-            if ('link' === $dataType) {
-                $output[] = $this->getLinkCell($value, $linkStyle, $stringStyle);
-                continue;
+            // These types may receive array values; handle before the
+            // scalar trim() below.
+            switch ($dataType) {
+                case 'link':
+                    $output[] = $this->getLinkCell($value, $linkStyle, $stringStyle);
+                    continue 2;
+                case 'image':
+                    $output[] = $this->getImageCell($value, $linkStyle, $stringStyle);
+                    continue 2;
+                case 'formula':
+                    $output[] = $this->getFormulaCell($value, $stringStyle);
+                    continue 2;
             }
 
             $value = trim($value);
@@ -431,6 +439,90 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
             return $label;
         }
         return sprintf('%s (%s)', $label, $url);
+    }
+
+    /**
+     * Build a cell for an `image` typed value. XLSX/XLS get a clickable
+     * `=IMAGE(...)` formula (Excel 365+); CSV/ODS get the URL as plain text.
+     *
+     * Accepts either a URL string or `['url' => ..., 'alt' => ...]`.
+     */
+    protected function getImageCell($value, Style $linkStyle, Style $emptyStyle): Cell
+    {
+        if (is_array($value)) {
+            $url = trim((string) ($value['url'] ?? ''));
+            $alt = trim((string) ($value['alt'] ?? $value['label'] ?? ''));
+        } else {
+            $url = trim((string) $value);
+            $alt = '';
+        }
+
+        if ('' === $url) {
+            return new EmptyCell('', $emptyStyle);
+        }
+
+        if (in_array($this->extension, ['xls', 'xlsx'], true)) {
+            $args = $this->escapeFormulaArg($url);
+            if ('' !== $alt) {
+                $args .= ',' . $this->escapeFormulaArg($alt);
+            }
+            $formula = '=IMAGE(' . $args . ')';
+            return new FormulaCell($formula, $linkStyle, '' !== $alt ? $alt : null);
+        }
+
+        // CSV/ODS fallback: just the URL (with alt parens if both differ).
+        $display = ('' !== $alt && $alt !== $url) ? sprintf('%s (%s)', $alt, $url) : $url;
+        return new StringCell($display, $emptyStyle);
+    }
+
+    /**
+     * Build a cell for a `formula` typed value. XLSX/XLS get a FormulaCell
+     * with the user-supplied formula; CSV/ODS write the computed value if
+     * provided, otherwise the literal formula text.
+     *
+     * Accepts a formula string (with or without leading `=`) or an array
+     * `['formula' => ..., 'computed' => ...]` where `computed` is an
+     * optional evaluated value.
+     */
+    protected function getFormulaCell($value, Style $emptyStyle): Cell
+    {
+        if (is_array($value)) {
+            $formula = trim((string) ($value['formula'] ?? ''));
+            $computed = $value['computed'] ?? null;
+        } else {
+            $formula = trim((string) $value);
+            $computed = null;
+        }
+
+        if ('' === $formula) {
+            return new EmptyCell('', $emptyStyle);
+        }
+
+        if (!str_starts_with($formula, '=')) {
+            $formula = '=' . $formula;
+        }
+
+        if (in_array($this->extension, ['xls', 'xlsx'], true)) {
+            return new FormulaCell($formula, $emptyStyle, $computed);
+        }
+
+        $fallback = null !== $computed ? (string) $computed : $formula;
+        return new StringCell($fallback, $emptyStyle);
+    }
+
+    /**
+     * Flatten any known array-shaped value (link/image/formula) to a string
+     * so the unmodelled normal-CSV path can serialize it cleanly.
+     */
+    protected function flattenArrayForCsv(array $value): string
+    {
+        if (isset($value['formula'])) {
+            return (string) ($value['computed'] ?? $value['formula']);
+        }
+        if (isset($value['url'])) {
+            return $this->flattenLinkForCsv($value);
+        }
+        return '';
     }
 
     /**

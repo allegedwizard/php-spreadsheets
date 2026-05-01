@@ -357,6 +357,117 @@ class WriteTest extends TestCase
         );
     }
 
+    // ---- Image type ----
+
+    public function testWriteXlsxImageTypeEmbedsImageFormula(): void
+    {
+        $path = $this->outputPath('images.xlsx');
+        $records = [
+            ['Name' => 'Cat', 'Pic' => 'https://example.com/cat.jpg'],
+            ['Name' => 'Dog', 'Pic' => ['url' => 'https://example.com/dog.png', 'alt' => 'A good dog']],
+            ['Name' => 'Empty', 'Pic' => ''],
+        ];
+        $model = [
+            'Name' => ['type' => 'string'],
+            'Pic'  => ['type' => 'image'],
+        ];
+
+        $writer = new Spreadsheets($path, 'write');
+        $writer->write($records, $model);
+
+        $zip = new \ZipArchive();
+        $zip->open($path);
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+
+        $this->assertStringContainsString('IMAGE(&quot;https://example.com/cat.jpg&quot;)', $sheetXml);
+        $this->assertStringContainsString('IMAGE(&quot;https://example.com/dog.png&quot;,&quot;A good dog&quot;)', $sheetXml);
+    }
+
+    public function testWriteCsvImageTypeFallsBackToUrl(): void
+    {
+        $path = $this->outputPath('images.csv');
+        $records = [
+            'columns' => ['Name', 'Pic'],
+            'rows' => [
+                ['Cat', 'https://example.com/cat.jpg'],
+                ['Dog', ['url' => 'https://example.com/dog.png', 'alt' => 'A good dog']],
+                ['Empty', ''],
+            ],
+        ];
+        $model = [
+            'Name' => ['type' => 'string'],
+            'Pic'  => ['type' => 'image'],
+        ];
+
+        $writer = new Spreadsheets($path, 'write');
+        $writer->write($records, $model, false, true);
+
+        $reader = new Spreadsheets($path);
+        $rows = $reader->toArray();
+
+        $this->assertCount(3, $rows);
+        $this->assertSame('https://example.com/cat.jpg', $rows[0]['Pic']);
+        $this->assertSame('A good dog (https://example.com/dog.png)', $rows[1]['Pic']);
+        $this->assertSame('', $rows[2]['Pic']);
+    }
+
+    // ---- Formula type ----
+
+    public function testWriteXlsxFormulaTypeEmbedsFormula(): void
+    {
+        $path = $this->outputPath('formulas.xlsx');
+        $records = [
+            ['Label' => 'Sum', 'Value' => '=SUM(1,2,3)'],
+            // Without leading '=' -- writer should add it.
+            ['Label' => 'Product', 'Value' => 'PRODUCT(2,4)'],
+            // Array form with computed fallback.
+            ['Label' => 'Concat', 'Value' => ['formula' => '=CONCAT("a","b")', 'computed' => 'ab']],
+        ];
+        $model = [
+            'Label' => ['type' => 'string'],
+            'Value' => ['type' => 'formula'],
+        ];
+
+        $writer = new Spreadsheets($path, 'write');
+        $writer->write($records, $model);
+
+        $zip = new \ZipArchive();
+        $zip->open($path);
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+
+        $this->assertStringContainsString('<f>SUM(1,2,3)</f>', $sheetXml);
+        $this->assertStringContainsString('<f>PRODUCT(2,4)</f>', $sheetXml);
+        $this->assertStringContainsString('CONCAT(&quot;a&quot;,&quot;b&quot;)', $sheetXml);
+    }
+
+    public function testWriteCsvFormulaTypeFallsBackToComputedOrText(): void
+    {
+        $path = $this->outputPath('formulas.csv');
+        $records = [
+            'columns' => ['Label', 'Value'],
+            'rows' => [
+                ['Sum', '=SUM(1,2,3)'],
+                ['Concat', ['formula' => '=CONCAT("a","b")', 'computed' => 'ab']],
+            ],
+        ];
+        $model = [
+            'Label' => ['type' => 'string'],
+            'Value' => ['type' => 'formula'],
+        ];
+
+        $writer = new Spreadsheets($path, 'write');
+        $writer->write($records, $model, false, true);
+
+        $reader = new Spreadsheets($path);
+        $rows = $reader->toArray();
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('=SUM(1,2,3)', $rows[0]['Value']);
+        $this->assertSame('ab', $rows[1]['Value']);
+    }
+
     // ---- Creates directories ----
 
     public function testWriteCreatesDirectoryIfNeeded(): void
