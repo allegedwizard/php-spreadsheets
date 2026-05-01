@@ -150,6 +150,67 @@ class ReadTest extends TestCase
         $this->assertSame(3, $counts[$sheetKey]);
     }
 
+    // ---- Link fixtures ----
+
+    public function testWithLinksXlsxFixtureContainsHyperlinkFormula(): void
+    {
+        $path = $this->fixturePath('with-links.xlsx');
+        $this->assertFileExists($path);
+
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+
+        $this->assertNotFalse($sheetXml);
+        $this->assertStringContainsString(
+            'HYPERLINK(&quot;https://example.com&quot;,&quot;Example&quot;)',
+            $sheetXml
+        );
+        $this->assertStringContainsString(
+            'HYPERLINK(&quot;https://openspout.org&quot;,&quot;https://openspout.org&quot;)',
+            $sheetXml
+        );
+        $this->assertStringContainsString(
+            'HYPERLINK(&quot;https://github.com/openspout/openspout&quot;,&quot;OpenSpout on GitHub&quot;)',
+            $sheetXml
+        );
+    }
+
+    public function testReadXlsxHyperlinkCellReturnsRawFormula(): void
+    {
+        // Pin current behavior: our reader returns the raw formula string
+        // for HYPERLINK cells. If we ever add link-aware read parsing this
+        // assertion will need to update.
+        $rows = (new Spreadsheets($this->fixturePath('with-links.xlsx')))->toArray();
+
+        $this->assertCount(3, $rows);
+        $this->assertSame('Alice', $rows[0]['Name']);
+        $this->assertSame('=HYPERLINK("https://example.com","Example")', $rows[0]['Site']);
+        $this->assertSame('=HYPERLINK("https://openspout.org","https://openspout.org")', $rows[1]['Site']);
+        $this->assertSame('=HYPERLINK("https://github.com/openspout/openspout","OpenSpout on GitHub")', $rows[2]['Site']);
+    }
+
+    public function testReadCsvLinkFallbackReturnsFlattenedString(): void
+    {
+        $rows = (new Spreadsheets($this->fixturePath('with-links.csv')))->toArray();
+
+        $this->assertCount(3, $rows);
+        $this->assertSame('Example (https://example.com)', $rows[0]['Site']);
+        $this->assertSame('https://openspout.org', $rows[1]['Site']);
+        $this->assertSame('OpenSpout on GitHub (https://github.com/openspout/openspout)', $rows[2]['Site']);
+    }
+
+    public function testReadOdsLinkFallbackReturnsFlattenedString(): void
+    {
+        $rows = (new Spreadsheets($this->fixturePath('with-links.ods')))->toArray();
+
+        $this->assertCount(3, $rows);
+        $this->assertSame('Example (https://example.com)', $rows[0]['Site']);
+        $this->assertSame('https://openspout.org', $rows[1]['Site']);
+        $this->assertSame('OpenSpout on GitHub (https://github.com/openspout/openspout)', $rows[2]['Site']);
+    }
+
     // ---- Invalid path ----
 
     public function testInvalidPathThrowsException(): void

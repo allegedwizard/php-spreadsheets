@@ -7,6 +7,7 @@
 
 require __DIR__ . '/../../vendor/autoload.php';
 
+use AllegedWizard\PhpSpreadsheets\Spreadsheets;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use OpenSpout\Writer\CSV\Writer as CsvWriter;
@@ -49,5 +50,23 @@ $writer->addRow(Row::fromValues(['Name', 'Email', 'Age']));
 $writer->addRow(Row::fromValues(['Alice', 'alice@example.com', 30]));
 $writer->addRow(Row::fromValues(['Bob', 'bob@example.com', 25]));
 $writer->close();
+
+// --- with-links.xlsx / .ods / .csv ---
+// Generated via the Spreadsheets writer using the `link` model type so you
+// can open these by hand and verify the hyperlinks work in Excel/LibreOffice.
+$linkRecords = [
+    ['Name' => 'Alice', 'Site' => ['url' => 'https://example.com', 'label' => 'Example']],
+    ['Name' => 'Bob', 'Site' => 'https://openspout.org'],
+    ['Name' => 'Carol', 'Site' => ['url' => 'https://github.com/openspout/openspout', 'label' => 'OpenSpout on GitHub']],
+];
+$linkModel = [
+    'Name' => ['width' => 20, 'type' => 'string'],
+    'Site' => ['width' => 40, 'type' => 'link'],
+];
+
+foreach (['xlsx', 'ods', 'csv'] as $ext) {
+    $path = $fixturesDir . '/with-links.' . $ext;
+    (new Spreadsheets($path, 'write'))->write($linkRecords, $linkModel);
+}
 
 echo "Fixtures created successfully.\n";

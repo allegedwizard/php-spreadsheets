@@ -99,7 +99,24 @@ $model = [
 $spreadsheet->write($records, $model);
 ```
 
-Supported types: `string`, `number`, `currency`, `date`, `boolean`.
+Supported types: `string`, `number`, `currency`, `date`, `boolean`, `link`.
+
+#### Link Type
+
+The `link` type produces a clickable `=HYPERLINK(...)` formula in XLSX/XLS, and falls back to a plain `label (url)` string for CSV/ODS. Values may be either a plain URL string or an array with `url` and `label` keys:
+
+```php
+$records = [
+    ['Name' => 'Alice', 'Site' => ['url' => 'https://example.com', 'label' => 'Example']],
+    ['Name' => 'Bob',   'Site' => 'https://openspout.org'],
+];
+$model = [
+    'Name' => ['type' => 'string'],
+    'Site' => ['type' => 'link'],
+];
+
+$spreadsheet->write($records, $model);
+```
 
 ### Multiple Sheets
 

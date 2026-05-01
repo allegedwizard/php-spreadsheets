@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.3
+
+- Add `link` model type. Values can be a URL string or `['url' => ..., 'label' => ...]`. XLSX/XLS emit a clickable `=HYPERLINK(...)` formula; CSV/ODS fall back to a plain `label (url)` string. Embedded quotes are escaped per Excel formula rules.
+- Fix ODS write: `writeNormal`/`writeOptimized` previously only branched on csv/xls/xlsx, so `.ods` files were generated empty. Both normal and optimized ODS write now emit rows correctly.
+- Rename internal `_writeNormalXlsx`/`_writeOptimizedXlsx` to `_writeNormalSheet`/`_writeOptimizedSheet` since they handle any multi-sheet writer; gate the XLSX-only `SheetView` freeze-row block accordingly.
+- Add `with-links.xlsx`/`with-links.ods`/`with-links.csv` fixtures for manual inspection.
+
 ## v1.0.1
 
 - Expose temp folder override via `Spreadsheets` constructor (4th arg) and `setTempFolder()`

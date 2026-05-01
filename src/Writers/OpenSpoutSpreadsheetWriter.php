@@ -2,8 +2,10 @@
 
 namespace AllegedWizard\PhpSpreadsheets\Writers;
 
+use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Cell\DateTimeCell;
 use OpenSpout\Common\Entity\Cell\EmptyCell;
+use OpenSpout\Common\Entity\Cell\FormulaCell;
 use OpenSpout\Common\Entity\Cell\NumericCell;
 use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
@@ -123,11 +125,18 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
         $writer->addRow(Row::fromValues($headerColumns));
 
         foreach ($records as $row) {
+            // Normal CSV mode bypasses the model, but link values may still
+            // arrive as arrays -- flatten those to a string before writing.
+            foreach ($row as $key => $value) {
+                if (is_array($value)) {
+                    $row[$key] = $this->flattenLinkForCsv($value);
+                }
+            }
             $writer->addRow(Row::fromValues(array_values($row)));
         }
     }
 
-    protected function _writeNormalXlsx(AbstractWriter $writer, array $records, string $sheetName, int $sheetIndex): void
+    protected function _writeNormalSheet(AbstractWriter $writer, array $records, string $sheetName, int $sheetIndex): void
     {
         if (empty($sheetIndex)) {
             $sheet = $writer->getCurrentSheet();
@@ -140,7 +149,8 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
         $sheet->setName($sheetName);
         $this->setColumnWidths($sheet, $headerColumns);
 
-        if ($this->freezeHeader) {
+        // SheetView (freeze row) is XLSX-only; ODS ignores it.
+        if ($this->freezeHeader && in_array($this->extension, ['xls', 'xlsx'], true)) {
             $sheetView = new SheetView();
             $sheetView->setFreezeRow(2);
             $sheet->setSheetView($sheetView);
@@ -164,7 +174,7 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
         }
     }
 
-    protected function _writeOptimizedXlsx(AbstractWriter $writer, array $records, string $sheetName, int $sheetIndex): void
+    protected function _writeOptimizedSheet(AbstractWriter $writer, array $records, string $sheetName, int $sheetIndex): void
     {
         if (empty($sheetIndex)) {
             $sheet = $writer->getCurrentSheet();
@@ -177,7 +187,8 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
         $sheet->setName($sheetName);
         $this->setColumnWidths($sheet, $headerColumns);
 
-        if ($this->freezeHeader) {
+        // SheetView (freeze row) is XLSX-only; ODS ignores it.
+        if ($this->freezeHeader && in_array($this->extension, ['xls', 'xlsx'], true)) {
             $sheetView = new SheetView();
             $sheetView->setFreezeRow(2);
             $sheet->setSheetView($sheetView);
@@ -217,8 +228,8 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
                 $this->_writeNormalCsv($writer, $records);
             }
 
-            if (in_array($this->extension, ['xls', 'xlsx'])) {
-                $this->_writeNormalXlsx($writer, $records, $sheetName, $sheetIndex);
+            if (in_array($this->extension, ['xls', 'xlsx', 'ods'], true)) {
+                $this->_writeNormalSheet($writer, $records, $sheetName, $sheetIndex);
             }
 
             $sheetIndex++;
@@ -234,8 +245,8 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
                 $this->_writeOptimizedCsv($writer, $records);
             }
 
-            if (in_array($this->extension, ['xls', 'xlsx'])) {
-                $this->_writeOptimizedXlsx($writer, $records, $sheetName, $sheetIndex);
+            if (in_array($this->extension, ['xls', 'xlsx', 'ods'], true)) {
+                $this->_writeOptimizedSheet($writer, $records, $sheetName, $sheetIndex);
             }
 
             $sheetIndex++;
@@ -297,12 +308,23 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
         $currencyStyle = new Style;
         $currencyStyle->setFormat('$#,##0.00');
 
+        $linkStyle = new Style;
+        $linkStyle->setFontColor('0563C1');
+        $linkStyle->setFontUnderline();
+
         $output = [];
 
         foreach ($row as $column => $value) {
-            $value = trim($value);
             $modelColumn = strtolower(trim($column));
             $dataType = $this->model[$modelColumn]['type'] ?? 'string';
+
+            // Handle link before the trim, because link values may be arrays.
+            if ('link' === $dataType) {
+                $output[] = $this->getLinkCell($value, $linkStyle, $stringStyle);
+                continue;
+            }
+
+            $value = trim($value);
 
             if (empty($value) && '0' !== $value) {
                 $output[] = new EmptyCell($value, $stringStyle);
@@ -344,5 +366,79 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
         }
 
         return new Row($output);
+    }
+
+    /**
+     * Build a cell for a `link` typed value. XLSX/XLS get a clickable
+     * `=HYPERLINK(...)` formula; CSV/ODS get a plain "label (url)" string.
+     *
+     * Accepts either a string URL or `['url' => ..., 'label' => ...]`.
+     */
+    protected function getLinkCell($value, Style $linkStyle, Style $emptyStyle): Cell
+    {
+        [$url, $label] = $this->extractLink($value);
+
+        if ('' === $url && '' === $label) {
+            return new EmptyCell('', $emptyStyle);
+        }
+
+        if ('' !== $url && in_array($this->extension, ['xls', 'xlsx'], true)) {
+            $formula = sprintf(
+                '=HYPERLINK(%s,%s)',
+                $this->escapeFormulaArg($url),
+                $this->escapeFormulaArg($label)
+            );
+            return new FormulaCell($formula, $linkStyle, $label);
+        }
+
+        return new StringCell($this->flattenLinkForCsv($value), $emptyStyle);
+    }
+
+    /**
+     * Pull (url, label) out of a link value, accepting either a string URL or
+     * an associative array. Label defaults to the URL when missing.
+     *
+     * @return array{0: string, 1: string} Tuple of [url, label].
+     */
+    protected function extractLink($value): array
+    {
+        if (is_array($value)) {
+            $url = trim((string) ($value['url'] ?? ''));
+            $label = trim((string) ($value['label'] ?? ''));
+        } else {
+            $url = trim((string) $value);
+            $label = '';
+        }
+
+        if ('' === $label) {
+            $label = $url;
+        }
+
+        return [$url, $label];
+    }
+
+    /**
+     * Flatten a link value to a plain string for non-formula targets (CSV/ODS).
+     */
+    protected function flattenLinkForCsv($value): string
+    {
+        [$url, $label] = $this->extractLink($value);
+
+        if ('' === $url && '' === $label) {
+            return '';
+        }
+        if ('' === $url || $url === $label) {
+            return $label;
+        }
+        return sprintf('%s (%s)', $label, $url);
+    }
+
+    /**
+     * Wrap a value in double quotes and double-up any embedded quotes so it's
+     * a valid Excel formula string argument.
+     */
+    protected function escapeFormulaArg(string $value): string
+    {
+        return '"' . str_replace('"', '""', $value) . '"';
     }
 }

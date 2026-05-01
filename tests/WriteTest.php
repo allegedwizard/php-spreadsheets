@@ -210,6 +210,153 @@ class WriteTest extends TestCase
         $this->assertSame($spreadsheet, $spreadsheet->setBoldHeader(false));
     }
 
+    // ---- ODS write ----
+
+    public function testWriteOdsAndReadBack(): void
+    {
+        $path = $this->outputPath('output.ods');
+        $records = [
+            ['Name' => 'Alice', 'Email' => 'alice@example.com'],
+            ['Name' => 'Bob', 'Email' => 'bob@example.com'],
+        ];
+
+        $writer = new Spreadsheets($path, 'write');
+        $writer->write($records);
+
+        $this->assertFileExists($path);
+
+        $reader = new Spreadsheets($path);
+        $rows = $reader->toArray();
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('Alice', $rows[0]['Name']);
+        $this->assertSame('bob@example.com', $rows[1]['Email']);
+    }
+
+    public function testWriteOdsOptimizedAndReadBack(): void
+    {
+        $path = $this->outputPath('optimized.ods');
+        $records = [
+            'columns' => ['Name', 'Email'],
+            'rows' => [
+                ['Alice', 'alice@example.com'],
+                ['Bob', 'bob@example.com'],
+            ],
+        ];
+
+        $writer = new Spreadsheets($path, 'write');
+        $writer->write($records, [], false, true);
+
+        $reader = new Spreadsheets($path);
+        $rows = $reader->toArray();
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('Alice', $rows[0]['Name']);
+    }
+
+    // ---- Link type ----
+
+    public function testWriteXlsxLinkTypeEmbedsHyperlinkFormula(): void
+    {
+        $path = $this->outputPath('links.xlsx');
+        $records = [
+            ['Name' => 'Alice', 'Site' => ['url' => 'https://example.com', 'label' => 'Example']],
+            ['Name' => 'Bob', 'Site' => 'https://openspout.org'],
+            ['Name' => 'Carol', 'Site' => ''],
+        ];
+        $model = [
+            'Name' => ['type' => 'string'],
+            'Site' => ['type' => 'link'],
+        ];
+
+        $writer = new Spreadsheets($path, 'write');
+        $writer->write($records, $model);
+
+        $this->assertFileExists($path);
+
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+
+        $this->assertNotFalse($sheetXml);
+        // OpenSpout escapes quotes in formulas as XML entities.
+        $this->assertStringContainsString('HYPERLINK(&quot;https://example.com&quot;,&quot;Example&quot;)', $sheetXml);
+        $this->assertStringContainsString('HYPERLINK(&quot;https://openspout.org&quot;,&quot;https://openspout.org&quot;)', $sheetXml);
+    }
+
+    public function testWriteCsvOptimizedLinkTypeFallsBackToText(): void
+    {
+        $path = $this->outputPath('links.csv');
+        $records = [
+            'columns' => ['Name', 'Site'],
+            'rows' => [
+                ['Alice', ['url' => 'https://example.com', 'label' => 'Example']],
+                ['Bob', 'https://openspout.org'],
+                ['Carol', ''],
+            ],
+        ];
+        $model = [
+            'Name' => ['type' => 'string'],
+            'Site' => ['type' => 'link'],
+        ];
+
+        $writer = new Spreadsheets($path, 'write');
+        $writer->write($records, $model, false, true);
+
+        $reader = new Spreadsheets($path);
+        $rows = $reader->toArray();
+
+        $this->assertCount(3, $rows);
+        $this->assertSame('Example (https://example.com)', $rows[0]['Site']);
+        $this->assertSame('https://openspout.org', $rows[1]['Site']);
+        $this->assertSame('', $rows[2]['Site']);
+    }
+
+    public function testWriteCsvNormalLinkValueFlattensArray(): void
+    {
+        $path = $this->outputPath('links-normal.csv');
+        $records = [
+            ['Name' => 'Alice', 'Site' => ['url' => 'https://example.com', 'label' => 'Example']],
+            ['Name' => 'Bob', 'Site' => 'https://openspout.org'],
+        ];
+
+        // No model passed; normal CSV mode should still flatten array values.
+        $writer = new Spreadsheets($path, 'write');
+        $writer->write($records);
+
+        $reader = new Spreadsheets($path);
+        $rows = $reader->toArray();
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('Example (https://example.com)', $rows[0]['Site']);
+        $this->assertSame('https://openspout.org', $rows[1]['Site']);
+    }
+
+    public function testWriteXlsxLinkTypeEscapesEmbeddedQuotes(): void
+    {
+        $path = $this->outputPath('links-quotes.xlsx');
+        $records = [
+            ['Site' => ['url' => 'https://example.com/?q="hi"', 'label' => 'Say "hi"']],
+        ];
+        $model = ['Site' => ['type' => 'link']];
+
+        $writer = new Spreadsheets($path, 'write');
+        $writer->write($records, $model);
+
+        $zip = new \ZipArchive();
+        $zip->open($path);
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+
+        // Excel formula escapes embedded quotes by doubling them; the XML
+        // layer then encodes each quote as &quot;.
+        $this->assertStringContainsString(
+            'HYPERLINK(&quot;https://example.com/?q=&quot;&quot;hi&quot;&quot;&quot;,&quot;Say &quot;&quot;hi&quot;&quot;&quot;)',
+            $sheetXml
+        );
+    }
+
     // ---- Creates directories ----
 
     public function testWriteCreatesDirectoryIfNeeded(): void
