@@ -18,6 +18,7 @@ class Spreadsheets
 {
     protected string $path;
     protected string $extension;
+    protected ?string $tempFolder = null;
     protected AbstractSpreadsheetReader $reader;
     protected AbstractSpreadsheetWriter $writer;
 
@@ -25,11 +26,14 @@ class Spreadsheets
      * @param  string  $path  Absolute path to file to read or write.
      * @param  string  $context  Accepts 'read' or 'write'.
      * @param  string  $extension  Override file extension.
+     * @param  string|null  $tempFolder  Override the temp folder used by the
+     *         underlying OpenSpout/PhpSpreadsheet engine. Created if missing.
      */
-    public function __construct(string $path, string $context = 'read', string $extension = '')
+    public function __construct(string $path, string $context = 'read', string $extension = '', ?string $tempFolder = null)
     {
         $this->path = $path;
         $this->extension = $extension;
+        $this->tempFolder = $tempFolder;
 
         if ('read' === $context) {
             $this->getReader();
@@ -38,6 +42,29 @@ class Spreadsheets
         if ('write' === $context) {
             $this->getWriter();
         }
+    }
+
+    /**
+     * Override the temp folder used by the underlying engine. For the read
+     * context this must be set via the constructor since the reader is opened
+     * eagerly; calling this method after construction has no effect on an
+     * already-opened reader.
+     */
+    public function setTempFolder(?string $tempFolder): self
+    {
+        $this->tempFolder = $tempFolder;
+        if (isset($this->writer)) {
+            $this->writer->setTempFolder($tempFolder);
+        }
+        if (isset($this->reader)) {
+            $this->reader->setTempFolder($tempFolder);
+        }
+        return $this;
+    }
+
+    public function getTempFolder(): ?string
+    {
+        return $this->tempFolder;
     }
 
     public function setFreezeHeader(bool $freeze): self
@@ -86,12 +113,14 @@ class Spreadsheets
             if ($this->extension) {
                 $reader->setExtension($this->extension);
             }
+            $reader->setTempFolder($this->tempFolder);
             $reader->getReader();
         } catch (\Exception $e) {
             $reader = new PhpSpreadsheetsSpreadsheetReader($this->path);
             if ($this->extension) {
                 $reader->setExtension($this->extension);
             }
+            $reader->setTempFolder($this->tempFolder);
             $reader->getReader();
         }
 
@@ -110,6 +139,7 @@ class Spreadsheets
         if ($this->extension) {
             $writer->setExtension($this->extension);
         }
+        $writer->setTempFolder($this->tempFolder);
 
         $this->writer = $writer;
 

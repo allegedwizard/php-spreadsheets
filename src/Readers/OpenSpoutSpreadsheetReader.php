@@ -20,7 +20,11 @@ class OpenSpoutSpreadsheetReader extends AbstractSpreadsheetReader
         switch ($this->extension) {
             case 'xls':
             case 'xlsx':
-                $reader = new \OpenSpout\Reader\XLSX\Reader;
+                $options = new \OpenSpout\Reader\XLSX\Options();
+                if ($this->tempFolder !== null) {
+                    $options->setTempFolder($this->tempFolder);
+                }
+                $reader = new \OpenSpout\Reader\XLSX\Reader($options);
                 break;
             case 'csv':
             case 'txt':

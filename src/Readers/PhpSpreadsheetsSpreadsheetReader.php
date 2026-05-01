@@ -13,6 +13,15 @@ class PhpSpreadsheetsSpreadsheetReader extends AbstractSpreadsheetReader
             return $this->reader;
         }
 
+        if ($this->tempFolder !== null) {
+            // PhpSpreadsheet has no public API for a custom temp folder -- it
+            // routes everything through sys_get_temp_dir(), which on POSIX
+            // honors TMPDIR and on Windows honors TMP/TEMP.
+            putenv('TMPDIR=' . $this->tempFolder);
+            putenv('TMP=' . $this->tempFolder);
+            putenv('TEMP=' . $this->tempFolder);
+        }
+
         $reader = IOFactory::createReader(ucfirst($this->extension));
         $worksheets = $reader->load($this->path);
         $this->reader = $worksheets;

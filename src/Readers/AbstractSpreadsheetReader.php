@@ -10,6 +10,7 @@ abstract class AbstractSpreadsheetReader
     protected mixed $reader;
     protected array $limitColumns = [];
     protected array $unparsable = [];
+    protected ?string $tempFolder = null;
 
     /**
      * @var string Separator for {sheetName}:::{sheetIndex} to support
@@ -102,6 +103,22 @@ abstract class AbstractSpreadsheetReader
     public function setExtension(string $extension): void
     {
         $this->extension = $extension;
+    }
+
+    public function setTempFolder(?string $tempFolder): self
+    {
+        if ($tempFolder !== null && !is_dir($tempFolder)) {
+            if (!mkdir($tempFolder, 0777, true) && !is_dir($tempFolder)) {
+                throw new \Exception('Unable to create temp folder: ' . $tempFolder);
+            }
+        }
+        $this->tempFolder = $tempFolder;
+        return $this;
+    }
+
+    public function getTempFolder(): ?string
+    {
+        return $this->tempFolder;
     }
 
     public function getUnparsable(): array

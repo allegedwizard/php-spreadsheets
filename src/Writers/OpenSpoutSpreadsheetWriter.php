@@ -36,13 +36,21 @@ class OpenSpoutSpreadsheetWriter extends AbstractSpreadsheetWriter
         switch ($this->extension) {
             case 'xls':
             case 'xlsx':
-                $writer = new \OpenSpout\Writer\XLSX\Writer;
+                $options = new \OpenSpout\Writer\XLSX\Options();
+                if ($this->tempFolder !== null) {
+                    $options->setTempFolder($this->tempFolder);
+                }
+                $writer = new \OpenSpout\Writer\XLSX\Writer($options);
                 break;
             case 'csv':
                 $writer = new \OpenSpout\Writer\CSV\Writer;
                 break;
             case 'ods':
-                $writer = new \OpenSpout\Writer\ODS\Writer;
+                $options = new \OpenSpout\Writer\ODS\Options();
+                if ($this->tempFolder !== null) {
+                    $options->setTempFolder($this->tempFolder);
+                }
+                $writer = new \OpenSpout\Writer\ODS\Writer($options);
                 break;
         }
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.1
+
+- Expose temp folder override via `Spreadsheets` constructor (4th arg) and `setTempFolder()`
+- Wired through to OpenSpout XLSX reader, OpenSpout XLSX/ODS writer, and PhpSpreadsheet reader (via `TMPDIR`/`TMP`/`TEMP` env vars, since PhpSpreadsheet has no public API)
+- Auto-creates the temp folder if it doesn't exist
+
 ## v1.0.0
 
 - Initial stable release

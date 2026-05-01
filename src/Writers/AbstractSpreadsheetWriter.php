@@ -6,6 +6,7 @@ abstract class AbstractSpreadsheetWriter
 {
     protected string $path;
     protected string $extension;
+    protected ?string $tempFolder = null;
 
     public function __construct(string $path)
     {
@@ -41,5 +42,21 @@ abstract class AbstractSpreadsheetWriter
     public function setExtension(string $extension): void
     {
         $this->extension = $extension;
+    }
+
+    public function setTempFolder(?string $tempFolder): self
+    {
+        if ($tempFolder !== null && !is_dir($tempFolder)) {
+            if (!mkdir($tempFolder, 0777, true) && !is_dir($tempFolder)) {
+                throw new \Exception('Unable to create temp folder: ' . $tempFolder);
+            }
+        }
+        $this->tempFolder = $tempFolder;
+        return $this;
+    }
+
+    public function getTempFolder(): ?string
+    {
+        return $this->tempFolder;
     }
 }
