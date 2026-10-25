@@ -143,18 +143,38 @@ class OpenSpoutSpreadsheetReader extends AbstractSpreadsheetReader
     }
 
     /**
-     * Detect the field delimiter by inspecting the first line of the file.
+     * Detect the field delimiter by inspecting the first line of the file:
+     * whichever of comma, semicolon, tab or pipe occurs most often outside
+     * quoted text wins, comma on ties. Excel exports CSV with semicolons in
+     * many locales and tab-separated .txt exports are common; a comma-only
+     * reader collapses those files into a single column.
      */
     protected function detectDelimiter(string $path): string
     {
         $handle = fopen($path, 'r');
-        $firstLine = fgets($handle);
-        fclose($handle);
-
-        if ($firstLine && substr_count($firstLine, "\t") > substr_count($firstLine, ',')) {
-            return "\t";
+        $firstLine = $handle ? fgets($handle) : false;
+        if ($handle) {
+            fclose($handle);
         }
 
-        return ',';
+        if (!$firstLine) {
+            return ',';
+        }
+
+        // Ignore delimiters inside double-quoted fields ("Smith, John").
+        $unquoted = preg_replace('/"[^"]*"/', '', $firstLine) ?? $firstLine;
+
+        $best = ',';
+        $bestCount = substr_count($unquoted, ',');
+
+        foreach ([';', "\t", '|'] as $candidate) {
+            $count = substr_count($unquoted, $candidate);
+            if ($count > $bestCount) {
+                $best = $candidate;
+                $bestCount = $count;
+            }
+        }
+
+        return $best;
     }
 }

@@ -104,6 +104,21 @@ class ReadTest extends TestCase
         $this->assertSame(['Name', 'Email', 'Age'], $columns);
     }
 
+    // ---- Semicolon-delimited CSV (Excel in many locales) ----
+
+    public function testReadSemicolonCsvDetectsDelimiter(): void
+    {
+        $spreadsheet = new Spreadsheets($this->fixturePath('semicolons.csv'));
+
+        $this->assertSame(['Name', 'Email', 'Age'], $spreadsheet->getColumns());
+
+        $rows = $spreadsheet->toArray();
+        $this->assertCount(2, $rows);
+        // A quoted comma inside a field must not sway the detection.
+        $this->assertSame('Smith, Alice', $rows[0]['Name']);
+        $this->assertSame('bob@example.com', $rows[1]['Email']);
+    }
+
     // ---- Tab-delimited TXT ----
 
     public function testReadTabDelimitedTxt(): void

@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.6
+
+- Fix CSV delimiter detection: the reader only told tabs from commas, so a semicolon-separated CSV (the default Excel export in many locales) or a pipe-separated file collapsed into a single column. The header line is now scanned for comma, semicolon, tab and pipe, ignoring delimiters inside quoted fields, and the most frequent one wins (comma on ties). Adds the `semicolons.csv` fixture and a read test.
+
 ## v1.0.5
 
 - Fix `image` type so Excel renders the image instead of showing `@IMAGE(...)`. Post-2007 Excel functions must be stored with the `_xlfn.` prefix in the XLSX XML; without it Excel injects the implicit-intersection `@` operator and the formula doesn't evaluate. Emit `=_xlfn.IMAGE(...)` -- Excel strips the prefix for display.
