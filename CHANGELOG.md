@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.7
+
+- Fix rows with fewer cells than the header being dropped. A CSV line that leaves off its trailing empty fields (`Bob,bob@example.com` under a three-column header, which many tools write) was set aside as unparsable and silently missing from `toArray()`. Both readers now pad a short row with empty strings and drop empty cells beyond the header (`AbstractSpreadsheetReader::fitRowToColumns()`); only a row with data beyond the header's columns is still set aside. An empty trailing cell holding `0` is no longer treated as empty.
+- Add `Spreadsheets::getUnparsable()`: the rows `toArray()` left out, so callers can report them instead of losing them.
+- Adds the `short-rows.csv` fixture and read tests.
+
 ## v1.0.6
 
 - Fix CSV delimiter detection: the reader only told tabs from commas, so a semicolon-separated CSV (the default Excel export in many locales) or a pipe-separated file collapsed into a single column. The header line is now scanned for comma, semicolon, tab and pipe, ignoring delimiters inside quoted fields, and the most frequent one wins (comma on ties). Adds the `semicolons.csv` fixture and a read test.

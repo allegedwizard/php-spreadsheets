@@ -119,6 +119,29 @@ class ReadTest extends TestCase
         $this->assertSame('bob@example.com', $rows[1]['Email']);
     }
 
+    // ---- Rows with fewer / more cells than the header ----
+
+    public function testReadCsvPadsShortRows(): void
+    {
+        $spreadsheet = new Spreadsheets($this->fixturePath('short-rows.csv'));
+        $rows = $spreadsheet->toArray();
+
+        // Alice, Bob, Carol, Dave; Eve has data beyond the header.
+        $this->assertCount(4, $rows);
+        $this->assertSame(['Name' => 'Bob', 'Email' => 'bob@example.com', 'Age' => ''], $rows[1]);
+        $this->assertSame(['Name' => 'Carol', 'Email' => '', 'Age' => ''], $rows[2]);
+        // Empty trailing cells beyond the header are dropped.
+        $this->assertSame(['Name' => 'Dave', 'Email' => 'dave@example.com', 'Age' => '40'], $rows[3]);
+    }
+
+    public function testRowsWithDataBeyondHeaderAreUnparsable(): void
+    {
+        $spreadsheet = new Spreadsheets($this->fixturePath('short-rows.csv'));
+        $spreadsheet->toArray();
+
+        $this->assertSame([['Eve', 'eve@example.com', '22', 'extra']], $spreadsheet->getUnparsable());
+    }
+
     // ---- Tab-delimited TXT ----
 
     public function testReadTabDelimitedTxt(): void

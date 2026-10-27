@@ -63,6 +63,33 @@ abstract class AbstractSpreadsheetReader
         return $row;
     }
 
+    /**
+     * Fit a row's cells to the header's width. A row with fewer cells than
+     * the header (a CSV line that leaves off its trailing empty fields, which
+     * many tools write) is padded with empty strings; empty cells beyond the
+     * header are dropped. A row that still has more cells than the header
+     * holds data in unnamed columns and is left as is, so the caller sets it
+     * aside in $unparsable.
+     */
+    protected function fitRowToColumns(array $row, int $columnCount): array
+    {
+        $row = array_values($row);
+
+        while (count($row) > $columnCount) {
+            $last = end($row);
+            if (null !== $last && '' !== $last) {
+                break;
+            }
+            array_pop($row);
+        }
+
+        if (count($row) < $columnCount) {
+            $row = array_pad($row, $columnCount, '');
+        }
+
+        return $row;
+    }
+
     protected function getSheetKey(string $sheetName, int $sheetIndex): string
     {
         return sprintf('%s%s%s', $sheetName, $this->sheetNameSeparator, $sheetIndex);

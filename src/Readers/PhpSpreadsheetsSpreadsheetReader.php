@@ -80,6 +80,8 @@ class PhpSpreadsheetsSpreadsheetReader extends AbstractSpreadsheetReader
                     $rowOutput[] = $cell->getFormattedValue();
                 }
 
+                $rowOutput = $this->fitRowToColumns($rowOutput, count($sheetColumns));
+
                 if (count($sheetColumns) !== count($rowOutput)) {
                     $this->unparsable[] = $rowOutput;
                 } else {

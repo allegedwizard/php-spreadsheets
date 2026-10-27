@@ -184,6 +184,15 @@ class Spreadsheets
     }
 
     /**
+     * Rows toArray() left out because they hold data beyond the header's
+     * columns, as lists of cell values. Filled by toArray().
+     */
+    public function getUnparsable(): array
+    {
+        return $this->getReader()->getUnparsable();
+    }
+
+    /**
      * Convert an associative array of records to a CSV string.
      *
      * @param  array  $records

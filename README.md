@@ -37,6 +37,15 @@ if ($spreadsheet->hasMultipleSheets()) {
 }
 ```
 
+### Rows That Don't Match the Header
+
+A row with fewer cells than the header (a CSV line that leaves off its trailing empty fields) is padded with empty strings, and empty cells beyond the header are ignored. A row that holds data beyond the header's columns is left out of `toArray()`; read those rows, as plain lists of cell values, after calling it:
+
+```php
+$rows = $spreadsheet->toArray();
+$skipped = $spreadsheet->getUnparsable();
+```
+
 ### Limiting Columns
 
 ```php

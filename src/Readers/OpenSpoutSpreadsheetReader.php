@@ -97,15 +97,7 @@ class OpenSpoutSpreadsheetReader extends AbstractSpreadsheetReader
                     $rowOutput[] = $cell->getValue();
                 }
 
-                // Column count mismatch — attempt to trim trailing empties.
-                if (count($sheetColumns) !== count($rowOutput)) {
-                    $columnCount = count($sheetColumns) - 1;
-                    foreach ($rowOutput as $index => $value) {
-                        if ($index > $columnCount && empty($value)) {
-                            unset($rowOutput[$index]);
-                        }
-                    }
-                }
+                $rowOutput = $this->fitRowToColumns($rowOutput, count($sheetColumns));
 
                 if (count($sheetColumns) !== count($rowOutput)) {
                     $this->unparsable[] = $rowOutput;
